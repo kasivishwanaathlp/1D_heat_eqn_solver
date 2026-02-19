@@ -28,7 +28,7 @@ class Params:
     timesteps: int
     calc_CFL: float
 
-#CHECKS-input
+#rule-tables
 INPUT_CHECKS=[
     ("diffusivity", lambda i:isinstance(i,(int,float)) and i>0, "must be >0", "error"),
     ("rod_length", lambda i:isinstance(i,(int,float)) and i>0, "must be >0", "error"),
@@ -59,6 +59,7 @@ DERIVED_CHECKS=[
     ("calc_CFL", lambda i:isinstance(i,numbers.Real) and 0<i<=0.5, "calculated CFL >0.5", "error"),
 ]
 
+#CHECKS-input
 def input_checks(IP_file, rule_table):
     errors=[]
     warnings=[]
@@ -88,7 +89,7 @@ def params_DERIVED(IP_file):
     calc_CFL=(IP_file["diffusivity"]*dt)/(dx**2)
     return {"dx":dx, "dt":dt, "timesteps":timesteps, "calc_CFL":calc_CFL}
 
-#CHECKS-derived--w/-SUGGESTIONS
+#CHECKS-derived
 def derived_checks(IP_dict, rule_table):
     errors=[]
     warnings=[]
@@ -106,12 +107,12 @@ def derived_checks(IP_dict, rule_table):
     if errors:
         raise ValueError("\nDerived parameters validation failed:\n" + "\n".join(errors))
 
+#pre-init
 def assemble_params(IP_file):
     input_checks(IP_file, INPUT_CHECKS)
     IP_file_derived=params_DERIVED(IP_file)
     derived_checks(IP_file_derived,DERIVED_CHECKS)
     return Params(**IP_file, **IP_file_derived)
-
 params = assemble_params(config)
 
 #init
@@ -120,12 +121,9 @@ def init(params):
     u[0]=params.t1
     u[-1]=params.t2
     return u
-
-
 u=init(params)
 
 #viz
-## TODO: document in "README" or "docs"
 ## TODO: add cmap options
 ## TODO: add toggles
 ## TODO: add anal soln comp
@@ -136,47 +134,44 @@ img=axis.imshow(u[np.newaxis,:],cmap='jet',aspect="auto",vmin=0,vmax=100)
 ## TODO: add "if __name__ == "__main__":" part for imports
 ## TODO: add implicit v explicit options
 ## TODO: vectorisation
-## TODO: compare loop and vectorized
-def solver_loop(params: Params, u):
-    for j in range(params.timesteps):
-        w = u.copy()
-        for i in range(1, params.nodes - 1):
-            u[i] = w[i] + (params.calc_CFL * (w[i + 1] - 2 * w[i] + w[i - 1]))
-        residuals = np.max(np.abs(w - u))
+def solver_loop(var1, var2):
+    for j in range(var1.timesteps):
+        w = var2.copy()
+        for i in range(1, var1.nodes - 1):
+            var2[i] = w[i] + (var1.calc_CFL * (w[i + 1] - 2 * w[i] + w[i - 1]))
+        residuals = np.max(np.abs(w - var2))
         print(residuals)
         ##TODO: ADD RESIDUALS PLOT HERE!!!
 
-        img.set_data(u[np.newaxis, :])
-        #plt.pause(1/params.fps)
+        img.set_data(var2[np.newaxis, :])
+        #plt.pause(1/var1.fps)
 
-        if residuals < params.target_residuals:
-            print(f"solution converged in {j} of {params.timesteps} iteration(s)")
+        if residuals < var1.target_residuals:
+            print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
     plt.show()
-solver_loop(params, u)
 
-def solver_vectorized(IP_file):
-    alpha = IP_file["diffusivity"] * dt / dx ** 2
-    for j in range(IP_file["timesteps"]):
-        w = u.copy()
-        u[1:-1]=w[1:-1]+(alpha*w[2:]-2*w[1:-1]+w[-2])
-        u[0]=IP_file["t1"]
-        u[-1] = IP_file["t2"]
-        residuals = np.max(np.abs(w - u))
+def solver_vectorized(var1,var2):
+    for j in range(var1.timesteps):
+        w = var2.copy()
+        var2[1:-1]=w[1:-1]+var1.calc_CFL*(w[2:]-2*w[1:-1]+w[:-2])
+        var2[0]=var1.t1
+        var2[-1]=var1.t2
+        residuals = np.max(np.abs(w - var2))
         print(residuals)
         ##TODO: ADD RESIDUALS PLOT HERE!!!
 
-        img.set_data(u[np.newaxis, :])
+        img.set_data(var2[np.newaxis, :])
         # plt.pause(1/fps)
 
-        if residuals < IP_file["target_residuals"]:
-            print(f"solution converged in {j} of {timesteps} iteration(s)")
+        if residuals < var1.target_residuals:
+            print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
-
     plt.show()
-solver_vectorized(config)
+solver_vectorized(params, u)
 
 #wiki
+## TODO: compare loop and vectorized
 ## TODO: look for top 3 tangible differences between loop and vectorized and how to documnet them
 
 ## TODO: "stress-test"
