@@ -121,35 +121,31 @@ def init(params):
     u[0]=params.t1
     u[-1]=params.t2
     return u
-u=init(params)
-
-#viz
-## TODO: add cmap options
-## TODO: add toggles
-## TODO: add anal soln comp
-fig, axis=plt.subplots()
-img=axis.imshow(u[np.newaxis,:],cmap='jet',aspect="auto",vmin=0,vmax=100)
 
 #solver
-## TODO: add "if __name__ == "__main__":" part for imports
-## TODO: add implicit v explicit options
-## TODO: vectorisation
-def solver_loop(var1, var2):
-    for j in range(var1.timesteps):
-        w = var2.copy()
-        for i in range(1, var1.nodes - 1):
-            var2[i] = w[i] + (var1.calc_CFL * (w[i + 1] - 2 * w[i] + w[i - 1]))
-        residuals = np.max(np.abs(w - var2))
-        print(residuals)
-        ##TODO: ADD RESIDUALS PLOT HERE!!!
+def solver_loop(var1):
+    u = init(var1)
 
-        img.set_data(var2[np.newaxis, :])
-        #plt.pause(1/var1.fps)
+    u_history=[]
+    residuals_history=[]
+    time_history=[]
+
+    for j in range(var1.timesteps):
+        w = u.copy()
+        for i in range(1, var1.nodes - 1):
+            u[i] = w[i] + (var1.calc_CFL * (w[i + 1] - 2 * w[i] + w[i - 1]))
+        residuals = np.max(np.abs(w - u))
+
+        u_history.append(u.copy())
+        residuals_history.append(residuals)
+        time_history.append(j*params.dt)
 
         if residuals < var1.target_residuals:
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
-    plt.show()
+
+    return { "u_history":np.array(u_history), "residuals_history":np.array(residuals_history), "time_history":np.array(time_history)}
+results=solver_loop(params)
 
 def solver_vectorized(var1,var2):
     for j in range(var1.timesteps):
@@ -168,10 +164,28 @@ def solver_vectorized(var1,var2):
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
     plt.show()
-solver_vectorized(params, u)
 
+#viz
+## TODO: add cmap options
+## TODO: add toggles
+## TODO: add anal soln comp
+def viz(results, params):
+    fig, ax = plt.subplots(1,2)
+
+    ax[0].plot(results["u_history"][-1])
+    ax[0].set_title("Final Temperature Distribution")
+
+    ax[1].plot(results["time_history"], results["residuals_history"])
+    ax[1].set_yscale("log")
+    ax[1].set_title("Residuals")
+
+    plt.tight_layout()
+    plt.show()
+viz(results, params)
+
+#main-fn
+## TODO: add "if __name__ == "__main__":" part for imports
+## TODO: "stress-test"
 #wiki
 ## TODO: compare loop and vectorized
 ## TODO: look for top 3 tangible differences between loop and vectorized and how to documnet them
-
-## TODO: "stress-test"
