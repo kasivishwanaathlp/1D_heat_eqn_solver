@@ -28,6 +28,12 @@ class Params:
     timesteps: int
     calc_CFL: float
 
+@dataclass(frozen=True)
+class Results:
+    u_history: np.ndarray
+    residuals_history: np.ndarray
+    time_history: np.ndarray
+
 #rule-tables
 INPUT_CHECKS=[
     ("diffusivity", lambda i:isinstance(i,(int,float)) and i>0, "must be >0", "error"),
@@ -144,7 +150,11 @@ def solver_loop(var1):
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
 
-    return { "u_history":np.array(u_history), "residuals_history":np.array(residuals_history), "time_history":np.array(time_history)}
+    return Results(
+        u_history=np.array(u_history),
+        residuals_history=np.array(residuals_history),
+        time_history=np.array(time_history),
+    )
 results=solver_loop(params)
 
 def solver_vectorized(var1,var2):
@@ -166,21 +176,49 @@ def solver_vectorized(var1,var2):
     plt.show()
 
 #viz
-## TODO: add cmap options
-## TODO: add toggles
-## TODO: add anal soln comp
 def viz(results, params):
-    fig, ax = plt.subplots(1,2)
+    x=np.linspace(0,params.rod_length,params.nodes)
+    u_final=results.u_history[-1]
+    u_anal=(params.t1)+(params.t2-params.t1)*(x/params.rod_length)
 
-    ax[0].plot(results["u_history"][-1])
-    ax[0].set_title("Final Temperature Distribution")
+    errors=u_final-u_anal
+    l_inf=np.max(np.abs(errors))
+    l2=np.sqrt(np.mean(errors**2))
+    ref = np.max(np.abs(u_anal))
+    percent_error = (l_inf / ref) * 100
 
-    ax[1].plot(results["time_history"], results["residuals_history"])
-    ax[1].set_yscale("log")
-    ax[1].set_title("Residuals")
+    # Create figure
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+
+    # ---- Temperature Profile ----
+    axs[0].plot(x, u_final, label="Numerical")
+    axs[0].plot(x, u_anal, "--", label="Analytical")
+
+    error_label = (
+        f"L∞ = {l_inf:.2e}, "
+        f"L2 = {l2:.2e}, "
+        f"% = {percent_error:.3f}%"
+    )
+    axs[0].plot([], [], ' ', label=error_label)
+
+    axs[0].set_xlabel("x")
+    axs[0].set_ylabel("Temperature")
+    axs[0].set_title("Final Temperature Profile")
+    axs[0].legend(loc="best")
+    axs[0].grid(True)
+
+    # ---- Residual Plot ----
+    axs[1].plot(results.time_history, results.residuals_history)
+    axs[1].set_yscale("log")
+    axs[1].set_xlabel("Time")
+    axs[1].set_ylabel("Residual")
+    axs[1].set_title("Residual vs Time")
+    axs[1].grid(True)
 
     plt.tight_layout()
     plt.show()
+
+    return l_inf, l2
 viz(results, params)
 
 #main-fn
