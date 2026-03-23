@@ -155,7 +155,7 @@ def solver_loop(var1):
         residuals_history=np.array(residuals_history),
         time_history=np.array(time_history),
     )
-results=solver_loop(params)
+results_loop = solver_loop(params)
 
 def solver_vectorized(var1,var2):
     for j in range(var1.timesteps):
@@ -174,11 +174,22 @@ def solver_vectorized(var1,var2):
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
     plt.show()
+#results_vec=solver_vectorized(params)
+
+#exports
+def exports(resutls_loop, pramas, filename="solution.txt"):
+    x = np.linspace(0, params.rod_length, params.nodes)
+    u_final = results_loop.u_history[-1]
+    u_anal = (params.t1) + (params.t2 - params.t1) * (x / params.rod_length)
+    data = np.column_stack((x, u_final, u_anal))
+    np.savetxt(filename, data, fmt="%.6f", delimiter="\t", header="x\tu_numerical\tu_analytical")
+    print(f"Solution exported to {filename}")
+exports(results_loop, params)
 
 #viz
-def viz(results, params):
+def viz(results_loop, params):
     x=np.linspace(0,params.rod_length,params.nodes)
-    u_final=results.u_history[-1]
+    u_final=results_loop.u_history[-1]
     u_anal=(params.t1)+(params.t2-params.t1)*(x/params.rod_length)
 
     errors=u_final-u_anal
@@ -186,40 +197,33 @@ def viz(results, params):
     l2=np.sqrt(np.mean(errors**2))
     ref = np.max(np.abs(u_anal))
     percent_error = (l_inf / ref) * 100
-
     # Create figure
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-
     # ---- Temperature Profile ----
-    axs[0].plot(x, u_final, label="Numerical")
-    axs[0].plot(x, u_anal, "--", label="Analytical")
-
+    axs[0].plot(x, u_final, label="Numerical", color="#CE31BE")
+    axs[0].plot(x, u_anal, "--", label="Analytical", color="#31CE41")
     error_label = (
         f"L∞ = {l_inf:.2e}, "
         f"L2 = {l2:.2e}, "
         f"% = {percent_error:.3f}%"
     )
     axs[0].plot([], [], ' ', label=error_label)
-
     axs[0].set_xlabel("x")
     axs[0].set_ylabel("Temperature")
     axs[0].set_title("Final Temperature Profile")
     axs[0].legend(loc="best")
     axs[0].grid(True)
-
     # ---- Residual Plot ----
-    axs[1].plot(results.time_history, results.residuals_history)
+    axs[1].plot(results_loop.time_history, results_loop.residuals_history, color="#CE31BE")
     axs[1].set_yscale("log")
     axs[1].set_xlabel("Time")
     axs[1].set_ylabel("Residual")
     axs[1].set_title("Residual vs Time")
     axs[1].grid(True)
-
     plt.tight_layout()
     plt.show()
-
     return l_inf, l2
-viz(results, params)
+viz(results_loop, params)
 
 #main-fn
 ## TODO: add "if __name__ == "__main__":" part for imports
