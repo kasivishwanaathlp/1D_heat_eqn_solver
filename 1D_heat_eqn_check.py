@@ -2,6 +2,8 @@
 import numbers
 import sys
 import logging
+import time
+
 import numpy as np
 import matplotlib.pyplot as plt
 logging.basicConfig(level=logging.WARNING, format="WARNING: %(message)s")
@@ -119,7 +121,6 @@ def assemble_params(IP_file):
     IP_file_derived=params_DERIVED(IP_file)
     derived_checks(IP_file_derived,DERIVED_CHECKS)
     return Params(**IP_file, **IP_file_derived)
-params = assemble_params(config)
 
 #init
 def init(params):
@@ -144,7 +145,7 @@ def solver_loop(var1):
 
         u_history.append(u.copy())
         residuals_history.append(residuals)
-        time_history.append(j*params.dt)
+        time_history.append(j*var1.dt)
 
         if residuals < var1.target_residuals:
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
@@ -155,41 +156,48 @@ def solver_loop(var1):
         residuals_history=np.array(residuals_history),
         time_history=np.array(time_history),
     )
-results_loop = solver_loop(params)
 
-def solver_vectorized(var1,var2):
+def solver_vectorized(var1):
+    u=init(var1)
+
+    u_history=[]
+    residuals_history=[]
+    time_history=[]
+
     for j in range(var1.timesteps):
-        w = var2.copy()
-        var2[1:-1]=w[1:-1]+var1.calc_CFL*(w[2:]-2*w[1:-1]+w[:-2])
-        var2[0]=var1.t1
-        var2[-1]=var1.t2
-        residuals = np.max(np.abs(w - var2))
-        print(residuals)
-        ##TODO: ADD RESIDUALS PLOT HERE!!!
+        w = u.copy()
+        u[1:-1]=w[1:-1]+var1.calc_CFL*(w[2:]-2*w[1:-1]+w[:-2])
+        u[0]=var1.t1
+        u[-1]=var1.t2
+        residuals = np.max(np.abs(w - u))
 
-        img.set_data(var2[np.newaxis, :])
-        # plt.pause(1/fps)
+        u_history.append(u.copy())
+        residuals_history.append(residuals)
+        time_history.append(j * var1.dt)
 
         if residuals < var1.target_residuals:
             print(f"solution converged in {j} of {var1.timesteps} iteration(s)")
             break
-    plt.show()
-#results_vec=solver_vectorized(params)
+
+    return Results(
+        u_history=np.array(u_history),
+        residuals_history=np.array(residuals_history),
+        time_history=np.array(time_history),
+    )
 
 #exports
-def exports(resutls_loop, pramas, filename="solution.txt"):
+def exports(resutls, pramas, filename="solution.txt"):
     x = np.linspace(0, params.rod_length, params.nodes)
-    u_final = results_loop.u_history[-1]
+    u_final = results.u_history[-1]
     u_anal = (params.t1) + (params.t2 - params.t1) * (x / params.rod_length)
     data = np.column_stack((x, u_final, u_anal))
     np.savetxt(filename, data, fmt="%.6f", delimiter="\t", header="x\tu_numerical\tu_analytical")
     print(f"Solution exported to {filename}")
-exports(results_loop, params)
 
 #viz
-def viz(results_loop, params):
+def viz(results, params):
     x=np.linspace(0,params.rod_length,params.nodes)
-    u_final=results_loop.u_history[-1]
+    u_final=results.u_history[-1]
     u_anal=(params.t1)+(params.t2-params.t1)*(x/params.rod_length)
 
     errors=u_final-u_anal
@@ -214,7 +222,7 @@ def viz(results_loop, params):
     axs[0].legend(loc="best")
     axs[0].grid(True)
     # ---- Residual Plot ----
-    axs[1].plot(results_loop.time_history, results_loop.residuals_history, color="#CE31BE")
+    axs[1].plot(results.time_history, results.residuals_history, color="#CE31BE")
     axs[1].set_yscale("log")
     axs[1].set_xlabel("Time")
     axs[1].set_ylabel("Residual")
@@ -223,7 +231,66 @@ def viz(results_loop, params):
     plt.tight_layout()
     plt.show()
     return l_inf, l2
-viz(results_loop, params)
+
+def compare_solvers(params):
+
+    start = time.perf_counter()
+    results = solver_loop(params)
+    loop_time = time.perf_counter() - start
+
+    start = time.perf_counter()
+    results_vec = solver_vectorized(params)
+    vec_time = time.perf_counter() - start
+
+    diff=np.max(np.abs(results.u_history[-1] - results_vec.u_history[-1]))
+
+    print("\n--- Solver Comparison ---")
+    print(f"Loop time       : {loop_time:.6f} s")
+    print(f"Vectorized time : {vec_time:.6f} s")
+    print(f"Speedup         : {loop_time / vec_time:.2f}x")
+    print(f"Final diff      : {diff:.3e}")
+    print(f"Iterations (loop): {len(results.time_history)}")
+    print(f"Iterations (vec) : {len(results_vec.time_history)}")
+
+def animate_solution(results, params):
+
+    u_hist = results.u_history
+    time = results.time_history
+
+    fig, ax = plt.subplots()
+
+    img = ax.imshow(
+        u_hist,
+        aspect="auto",
+        cmap="inferno",
+        extent=[0, params.rod_length, time[-1], 0]
+    )
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("time")
+    ax.set_title("Temperature Evolution")
+
+    cbar = plt.colorbar(img, ax=ax)
+    cbar.set_label("Temperature")
+
+    for i in range(len(u_hist)):
+        img.set_data(u_hist[:i+1])
+        plt.pause(1 / params.fps)
+
+    plt.show()
+
+def main():
+    params=assemble_params(config)
+    if config["use_vectorised"]:
+        results = solver_vectorized(params)
+    else:
+        results = solver_loop(params)
+    if config["export"]:
+        exports(results, params)
+    if config["plot"]:
+        viz(results, params)
+    if config["compare"]:
+        compare_solvers(params)
 
 #main-fn
 ## TODO: add "if __name__ == "__main__":" part for imports
