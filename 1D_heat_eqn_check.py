@@ -29,7 +29,6 @@ class Params:
     dt: float
     timesteps: int
     calc_CFL: float
-
 @dataclass(frozen=True)
 class Results:
     u_history: np.ndarray
@@ -66,6 +65,9 @@ DERIVED_CHECKS=[
 
     ("calc_CFL", lambda i:isinstance(i,numbers.Real) and 0<i<=0.5, "calculated CFL >0.5", "error"),
 ]
+NON_PARAM_KEYS = {
+    "animate", "plot", "export_solution", "export_residuals", "compare", "use_vectorised"
+    }
 
 #CHECKS-input
 def input_checks(IP_file, rule_table):
@@ -73,7 +75,7 @@ def input_checks(IP_file, rule_table):
     warnings=[]
     allowed_keys={rule[0] for rule in rule_table}
     for user_keys in IP_file:
-        if user_keys not in allowed_keys:
+        if user_keys not in allowed_keys and user_keys not in NON_PARAM_KEYS:
             warnings.append(f"unknown config key: {user_keys}")
     for key,rule,msg,severity in rule_table:
         if key not in IP_file:
@@ -118,9 +120,11 @@ def derived_checks(IP_dict, rule_table):
 #pre-init
 def assemble_params(IP_file):
     input_checks(IP_file, INPUT_CHECKS)
+    param_keys=Params.__annotations__.keys()
+    IP_file_filtered={k: IP_file[k] for k in param_keys if k in IP_file}
     IP_file_derived=params_DERIVED(IP_file)
     derived_checks(IP_file_derived,DERIVED_CHECKS)
-    return Params(**IP_file, **IP_file_derived)
+    return Params(**IP_file_filtered, **IP_file_derived)
 
 #init
 def init(params):
@@ -137,11 +141,17 @@ def solver_loop(var1):
     residuals_history=[]
     time_history=[]
 
+    initial_residual = None
+
     for j in range(var1.timesteps):
         w = u.copy()
         for i in range(1, var1.nodes - 1):
             u[i] = w[i] + (var1.calc_CFL * (w[i + 1] - 2 * w[i] + w[i - 1]))
         residuals = np.max(np.abs(w - u))
+
+        if initial_residual is None:
+            initial_residual = residuals
+        residuals/=initial_residual
 
         u_history.append(u.copy())
         residuals_history.append(residuals)
@@ -164,12 +174,18 @@ def solver_vectorized(var1):
     residuals_history=[]
     time_history=[]
 
+    initial_residual = None
+
     for j in range(var1.timesteps):
         w = u.copy()
         u[1:-1]=w[1:-1]+var1.calc_CFL*(w[2:]-2*w[1:-1]+w[:-2])
         u[0]=var1.t1
         u[-1]=var1.t2
         residuals = np.max(np.abs(w - u))
+
+        if initial_residual is None:
+            initial_residual = residuals
+        residuals/=initial_residual
 
         u_history.append(u.copy())
         residuals_history.append(residuals)
@@ -186,13 +202,18 @@ def solver_vectorized(var1):
     )
 
 #exports
-def exports(resutls, pramas, filename="solution.txt"):
+def export_solution(results, params, filename="solution.txt"):
     x = np.linspace(0, params.rod_length, params.nodes)
     u_final = results.u_history[-1]
     u_anal = (params.t1) + (params.t2 - params.t1) * (x / params.rod_length)
     data = np.column_stack((x, u_final, u_anal))
     np.savetxt(filename, data, fmt="%.6f", delimiter="\t", header="x\tu_numerical\tu_analytical")
     print(f"Solution exported to {filename}")
+
+def export_residuals(results, filename="residuals.txt"):
+    data = np.column_stack((results.time_history, results.residuals_history))
+    np.savetxt(filename, data, fmt="%.6e", delimiter="\t", header="time\tresidual", comments="")
+    print(f"Residuals exported to {filename}")
 
 #viz
 def viz(results, params):
@@ -229,7 +250,8 @@ def viz(results, params):
     axs[1].set_title("Residual vs Time")
     axs[1].grid(True)
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
+    plt.pause(1/params.fps)
     return l_inf, l2
 
 def compare_solvers(params):
@@ -277,24 +299,29 @@ def animate_solution(results, params):
         img.set_data(u_hist[:i+1])
         plt.pause(1 / params.fps)
 
-    plt.show()
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(1/params.fps)
+    ax.set_title("Temperature Evolution (Final State)")
 
+#main
 def main():
     params=assemble_params(config)
     if config["use_vectorised"]:
         results = solver_vectorized(params)
     else:
         results = solver_loop(params)
-    if config["export"]:
-        exports(results, params)
+    if config["export_solution"]:
+        export_solution(results, params)
+    if config["export_residuals"]:
+        export_residuals(results)
     if config["plot"]:
         viz(results, params)
     if config["compare"]:
         compare_solvers(params)
+    if config["animate"]:
+        animate_solution(results, params)
+    plt.show()
 
-#main-fn
-## TODO: add "if __name__ == "__main__":" part for imports
-## TODO: "stress-test"
-#wiki
-## TODO: compare loop and vectorized
-## TODO: look for top 3 tangible differences between loop and vectorized and how to documnet them
+if __name__ == "__main__":
+    main()

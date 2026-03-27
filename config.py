@@ -10,10 +10,10 @@ config = {
     "target_residuals":1e-3, #-
 
     "animate": True,
-    "fps":30, #fps"
+    "fps":30, #fps
     "plot": True,
-    "export": True,
-    "compare": False,
+    "export_solution": True,
+    "export_residuals": True,
+    "compare": True,
     "use_vectorised": True,
-
 }
