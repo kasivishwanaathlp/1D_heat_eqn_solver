@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project implements a 1D heat equation solver using an explicit finite difference scheme. It demonstrates numerical methods, validation, and clean software structure.
+This project implements a 1D heat equation solver using an explicit finite difference scheme. It demonstrates numerical methods and validation.
 
 ---
 
@@ -45,7 +45,7 @@ R(n) = max|T^n - T^(n-1)| / R(0)
 
 ## Features
 
-* Input validation with rule-based checks
+* Input validation with rule-table-based checks
 * Loop-based and vectorized solvers
 * Normalized residual tracking
 * Analytical solution comparison
@@ -78,8 +78,6 @@ Two implementations:
 
 * Loop-based
 * Vectorized (NumPy)
-
-Vectorization reduces Python loop overhead using optimized array operations.
 
 ---
 
