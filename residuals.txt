@@ -1,4 +1,4 @@
-iterations	time	residual
+iteration	time	residual
 0	0.000000	1.000000e+00
 1	0.000180	4.000000e-01
 2	0.000359	2.000000e-01

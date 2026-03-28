@@ -127,7 +127,9 @@ python main_1D_heat_eqn.py
 
 * Temperature profile (numerical vs analytical)
 * Residual vs time (log scale)
+![plots][def2]
 * Animated evolution (optional)
+![contour][def]
 
 ### Files
 
@@ -144,3 +146,6 @@ python main_1D_heat_eqn.py
 * Not optimized for large-scale problems
 
 ---
+
+[def]: contour.png
+[def2]: plots.png
