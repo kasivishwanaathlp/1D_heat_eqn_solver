@@ -50,18 +50,18 @@ INPUT_CHECKS=[
     ("ti", lambda i:isinstance(i,(int,float)), "must be numeric", "error"),
     ("target_CFL", lambda i:isinstance(i,numbers.Real) and 0<i<=0.5, "must be 0< and <=0.5", "error"),
 
-    ("target_residuals", lambda i:isinstance(i,(float)) and 0<i<1, "must be 0< and <1", "error"),
-    ("target_residuals", lambda i:isinstance(i,(float)) and i<=1e-2, "convergence might be loose", "warning"),
-    ("target_residuals", lambda i:isinstance(i,(float)) and i>=1e-9, "may cause excessive runtime", "warning"),
+    ("target_residuals", lambda i: isinstance(i, float) and 0 < i < 1, "must be 0< and <1", "error"),
+    ("target_residuals", lambda i: isinstance(i, float) and i <= 1e-2, "convergence might be loose", "warning"),
+    ("target_residuals", lambda i: isinstance(i, float) and i >= 1e-9, "may cause excessive runtime", "warning"),
 
     ("fps", lambda i:isinstance(i,int) and i>0, "must be an integer >0", "error"),
 ]
 DERIVED_CHECKS=[
     ("dt", lambda i:isinstance(i,(int,float)) and i>0, "computed dt is non-positive", "error"),
 
-    ("timesteps", lambda i:isinstance(i,(int)) and i>=1, "given simulation time smaller than unit timestep", "error"),
-    ("timesteps", lambda i:isinstance(i, (int)) and i<=1e7, "calculated no. of timesteps >1e7, simulation time might be excessive", "warning"),
-    ("timesteps", lambda i:isinstance(i, (int)) and i>=1e2, "calculated no. of timesteps <1e2, solution may not reach steady behaviour", "warning"),
+    ("timesteps", lambda i: isinstance(i, int) and i >= 1, "given simulation time smaller than unit timestep", "error"),
+    ("timesteps", lambda i: isinstance(i, int) and i <= 1e7, "calculated no. of timesteps >1e7, simulation time might be excessive", "warning"),
+    ("timesteps", lambda i: isinstance(i, int) and i >= 1e2, "calculated no. of timesteps <1e2, solution may not reach steady behaviour", "warning"),
 
     ("calc_CFL", lambda i:isinstance(i,numbers.Real) and 0<i<=0.5, "calculated CFL >0.5", "error"),
 ]
@@ -211,8 +211,9 @@ def export_solution(results, params, filename="solution.txt"):
     print(f"Solution exported to {filename}")
 
 def export_residuals(results, filename="residuals.txt"):
-    data = np.column_stack((results.time_history, results.residuals_history))
-    np.savetxt(filename, data, fmt="%.6e", delimiter="\t", header="time\tresidual", comments="")
+    iterations=np.arange(len(results.residuals_history))
+    data = np.column_stack((iterations,results.time_history, results.residuals_history))
+    np.savetxt(filename, data, fmt=["%d", "%.6f", "%.6e"], delimiter="\t", header="iteration\ttime\tresidual", comments="")
     print(f"Residuals exported to {filename}")
 
 #viz
@@ -279,7 +280,7 @@ def animate_solution(results, params):
     u_hist = results.u_history
     time = results.time_history
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12,4))
 
     img = ax.imshow(
         u_hist,
